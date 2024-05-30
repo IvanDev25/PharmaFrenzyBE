@@ -68,10 +68,10 @@ namespace Api.Controllers
                 EmailConfirmed = true
             };
 
-            var result =await _userManager.CreateAsync(userToAdd, model.Password);
+            var result = await _userManager.CreateAsync(userToAdd, model.Password);
             if (!result.Succeeded) return BadRequest(result.Errors);
 
-            return Ok("Your accoun has beec created, you can login");
+            return Ok(new JsonResult(new {title = "Account Created", message = "Your account has been created, you can login"}));
         }
         #region Private Helper Methods
         private UserDto CreateApplicationUserDto(User user)
