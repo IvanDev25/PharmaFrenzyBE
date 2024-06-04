@@ -13,19 +13,15 @@ namespace Api.Services
     public class JWTService
     {
         private readonly IConfiguration _config;
-        private readonly SymmetricSecurityKey _jwKey;
+        private readonly SymmetricSecurityKey _jwtKey;
 
         public JWTService(IConfiguration config)
         {
             _config = config;
-            var random = new RNGCryptoServiceProvider();
-            var keyBytes = new byte[64]; // 512 bits
-            random.GetBytes(keyBytes);
-            var base64Key = Convert.ToBase64String(keyBytes);
-
-            _jwKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(base64Key));
+            _jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:Key"]));
         }
-        public string CreateJWT(User user) 
+
+        public string CreateJWT(User user)
         {
             if (user == null)
             {
@@ -55,7 +51,7 @@ namespace Api.Services
                 userClaims.Add(new Claim(ClaimTypes.Surname, user.LastName));
             }
 
-            var credentials = new SigningCredentials(_jwKey, SecurityAlgorithms.HmacSha512Signature);
+            var credentials = new SigningCredentials(_jwtKey, SecurityAlgorithms.HmacSha512); // Use HmacSha512
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(userClaims),
@@ -69,4 +65,5 @@ namespace Api.Services
             return tokenHandler.WriteToken(jwt);
         }
     }
+
 }

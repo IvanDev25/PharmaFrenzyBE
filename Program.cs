@@ -93,6 +93,7 @@ app.UseCors(builder =>
            .AllowAnyHeader()
            .AllowAnyMethod();
 });
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
