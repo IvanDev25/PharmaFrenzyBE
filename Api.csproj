@@ -8,7 +8,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="DTOs\NewFolder1\**" />
+    <Compile Remove="DTOs\NewFolder\**" />
+    <Content Remove="DTOs\NewFolder1\**" />
+    <Content Remove="DTOs\NewFolder\**" />
+    <EmbeddedResource Remove="DTOs\NewFolder1\**" />
+    <EmbeddedResource Remove="DTOs\NewFolder\**" />
+    <None Remove="DTOs\NewFolder1\**" />
+    <None Remove="DTOs\NewFolder\**" />
+  </ItemGroup>
+
+  <ItemGroup>
 	  <!--to auhthenticate use using JWT Bearer-->
+    <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Mailjet.Api" Version="3.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.4" />
 	  <!--to be able to derive from IdentityDbContext inside our context.cs-->
@@ -24,6 +36,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
 	    <!--to be able to create , serialie and validate JSON web tokens-->
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Data\Migrations\" />
+    <Folder Include="Migrations\" />
   </ItemGroup>
 
 </Project>

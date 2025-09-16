@@ -1,4 +1,5 @@
 using Api.Data;
+using Api.Interface;
 using Api.Models;
 using Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -20,7 +21,41 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "Your API",
+        Version = "v1"
+    });
+
+    // Add JWT Authentication to Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter 'Bearer' [space] and then your valid token.\n\nExample: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+
 
 builder.Services.AddDbContext<Context>(options =>
 {
@@ -30,6 +65,12 @@ builder.Services.AddDbContext<Context>(options =>
 // be able to inject JWTService class inside our contorllers
 builder.Services.AddScoped<JWTService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<ICustomPlayerServiceAsync, CustomPlayerServiceAsync>();
+builder.Services.AddScoped<ICustomTeamServiceAsync, CustomTeamServiceAsync>();
+builder.Services.AddScoped<ICustomManagerServiceAsync, CustomManagerServiceAsync>();
+builder.Services.AddScoped<ICustomCategoryServiceAsync, CustomCategoryServiceAsync>();
+builder.Services.AddScoped<ICustomAdminPermissionAsync, CustomAdminPermissionAsync>();
+builder.Services.AddScoped<IDapperServiceAsync, DapperServiceAsync>();
 
 //defining our IdentityCore Service
 builder.Services.AddIdentityCore<User>(options =>
@@ -67,7 +108,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 
-builder.Services.AddCors();
+
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
@@ -85,15 +126,21 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularApp", policy =>
+    {
+        policy.WithOrigins("https://localhost:4200", "http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-app.UseCors(builder =>
-{
-    builder.WithOrigins("http://localhost:4200") // Allow requests from Angular application
-           .AllowAnyHeader()
-           .AllowAnyMethod();
-});
+app.UseCors("AllowAngularApp");
+
 
 if (app.Environment.IsDevelopment())
 {
