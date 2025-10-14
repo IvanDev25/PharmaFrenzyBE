@@ -34,7 +34,7 @@ namespace Api.Services
 
                 var parameters = new
                 {
-                    EventName =
+                    EventName = eventDto.EventName
                 };
 
                 var eventId = await _dapperServiceAsync.ExecuteScalarAsync<int>(
