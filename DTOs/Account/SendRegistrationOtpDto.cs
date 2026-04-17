@@ -1,11 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.DTOs.Account
 {
-    public class ConfirmEmailDto
+    public class SendRegistrationOtpDto
     {
-        [Required]
-        public string Token { get; set; }
         [Required]
         [EmailAddress(ErrorMessage = "Invalid Email Address")]
         public string Email { get; set; }

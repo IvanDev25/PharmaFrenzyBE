@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Linq;
 using System.Text;
 
@@ -19,6 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -59,17 +61,17 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddDbContext<Context>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    options.UseMySql(
+        connectionString,
+        new MySqlServerVersion(new Version(8, 0, 36)));
 });
 
 // be able to inject JWTService class inside our contorllers
 builder.Services.AddScoped<JWTService>();
 builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<ICustomPlayerServiceAsync, CustomPlayerServiceAsync>();
-builder.Services.AddScoped<ICustomTeamServiceAsync, CustomTeamServiceAsync>();
-builder.Services.AddScoped<ICustomManagerServiceAsync, CustomManagerServiceAsync>();
-builder.Services.AddScoped<ICustomCategoryServiceAsync, CustomCategoryServiceAsync>();
-builder.Services.AddScoped<ICustomAdminPermissionAsync, CustomAdminPermissionAsync>();
+builder.Services.AddScoped<RankingBadgeService>();
 builder.Services.AddScoped<IDapperServiceAsync, DapperServiceAsync>();
 
 //defining our IdentityCore Service
@@ -81,6 +83,8 @@ builder.Services.AddIdentityCore<User>(options =>
     options.Password.RequireLowercase = false;
     options.Password.RequireUppercase = false;
     options.Password.RequireNonAlphanumeric = false;
+    // Keep Identity key/index sizes MySQL-friendly if we switch providers later.
+    options.Stores.MaxLengthForKeys = 191;
     // for email confimation
     options.SignIn.RequireConfirmedEmail = true;
 })
@@ -130,7 +134,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp", policy =>
     {
-        policy.WithOrigins("https://localhost:4200", "http://localhost:4200")
+        policy.WithOrigins(
+                "https://localhost:4200",
+                "http://localhost:4200",
+                "https://pharma-frenzy-fe.vercel.app")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -139,14 +146,31 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
+    await dbContext.Database.MigrateAsync();
+
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var roles = new[] { "Admin", "Student" };
+
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
+    }
+}
+
 app.UseCors("AllowAngularApp");
 
-
-if (app.Environment.IsDevelopment())
+app.UseStaticFiles();
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.InjectJavascript("/swagger/swagger-login.js");
+});
 
 app.UseHttpsRedirection();
 
