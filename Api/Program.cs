@@ -163,16 +163,11 @@ using (var scope = app.Services.CreateScope())
 app.UseCors("AllowAngularApp");
 
 app.UseStaticFiles();
-
-
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.InjectJavascript("/swagger/swagger-login.js");
-    });
-}
+    c.InjectJavascript("/swagger/swagger-login.js");
+});
 
 app.UseHttpsRedirection();
 
