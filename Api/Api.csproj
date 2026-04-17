@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UserSecretsId>a3f368eb-f8d8-4622-93c9-f80ed85ec7d7</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="DTOs\NewFolder1\**" />
+    <Compile Remove="DTOs\NewFolder\**" />
+    <Compile Remove="Data\Migrations.SqlServerBackup\**" />
+    <Content Remove="DTOs\NewFolder1\**" />
+    <Content Remove="DTOs\NewFolder\**" />
+    <Content Remove="Data\Migrations.SqlServerBackup\**" />
+    <EmbeddedResource Remove="DTOs\NewFolder1\**" />
+    <EmbeddedResource Remove="DTOs\NewFolder\**" />
+    <EmbeddedResource Remove="Data\Migrations.SqlServerBackup\**" />
+    <None Remove="DTOs\NewFolder1\**" />
+    <None Remove="DTOs\NewFolder\**" />
+    <None Remove="Data\Migrations.SqlServerBackup\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+	  <!--to auhthenticate use using JWT Bearer-->
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Mailjet.Api" Version="3.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.25" />
+	  <!--to be able to derive from IdentityDbContext inside our context.cs-->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.25" />
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
+	  <!--to be able to communicate with MySQL via EF-->
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="6.0.2" />
+	  <!--to be able to add/remove igration to our SQLserver-->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.25">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+	    <!--to be able to create , serialie and validate JSON web tokens-->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.32.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Data\Migrations\" />
+  </ItemGroup>
+
+</Project>
