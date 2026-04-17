@@ -1,0 +1,7 @@
+.git
+.gitignore
+.artifacts
+.vs
+**/bin
+**/obj
+**/node_modules
