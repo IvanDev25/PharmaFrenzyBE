@@ -15,5 +15,6 @@ namespace Api.DTOs.Account
         public string Description { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public bool IsPremium { get; set; }
     }
 }

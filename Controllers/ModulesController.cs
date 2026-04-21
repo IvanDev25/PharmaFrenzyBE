@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.DTOs.Account;
+using Api.Interface;
 using Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using ExamModule = Api.Models.Module;
 
@@ -18,15 +20,19 @@ namespace Api.Controllers
     public class ModulesController : ControllerBase
     {
         private readonly Context _context;
+        private readonly IPremiumAccessService _premiumAccessService;
 
-        public ModulesController(Context context)
+        public ModulesController(Context context, IPremiumAccessService premiumAccessService)
         {
             _context = context;
+            _premiumAccessService = premiumAccessService;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ModuleDto>>> GetModules()
         {
+            var isStudent = User.IsInRole("Student");
+            var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
             var modules = await _context.Modules
                 .OrderBy(x => x.Name)
                 .Select(x => new ModuleDto
@@ -35,6 +41,8 @@ namespace Api.Controllers
                     Name = x.Name,
                     Description = x.Description,
                     IsActive = x.IsActive,
+                    IsPremium = x.IsPremium,
+                    RequiresSubscription = isStudent && x.IsPremium && !hasPremiumAccess,
                     SubjectCount = x.Subjects.Count(s => s.IsActive),
                     QuestionCount = x.Subjects.SelectMany(s => s.Questions).Count(q => q.IsActive),
                     CreatedAt = x.CreatedAt,
@@ -48,6 +56,8 @@ namespace Api.Controllers
         [HttpGet("{id:int}")]
         public async Task<ActionResult<ModuleDto>> GetModule(int id)
         {
+            var isStudent = User.IsInRole("Student");
+            var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
             var module = await _context.Modules
                 .Where(x => x.Id == id)
                 .Select(x => new ModuleDto
@@ -56,6 +66,8 @@ namespace Api.Controllers
                     Name = x.Name,
                     Description = x.Description,
                     IsActive = x.IsActive,
+                    IsPremium = x.IsPremium,
+                    RequiresSubscription = isStudent && x.IsPremium && !hasPremiumAccess,
                     SubjectCount = x.Subjects.Count(s => s.IsActive),
                     QuestionCount = x.Subjects.SelectMany(s => s.Questions).Count(q => q.IsActive),
                     CreatedAt = x.CreatedAt,
@@ -86,6 +98,7 @@ namespace Api.Controllers
                 Name = normalizedName,
                 Description = model.Description?.Trim(),
                 IsActive = model.IsActive,
+                IsPremium = model.IsPremium,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -93,7 +106,7 @@ namespace Api.Controllers
             _context.Modules.Add(module);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetModule), new { id = module.Id }, MapModule(module, 0, 0));
+            return CreatedAtAction(nameof(GetModule), new { id = module.Id }, MapModule(module, 0, 0, false));
         }
 
         [Authorize(Roles = "Admin")]
@@ -119,6 +132,7 @@ namespace Api.Controllers
             module.Name = normalizedName;
             module.Description = model.Description?.Trim();
             module.IsActive = model.IsActive;
+            module.IsPremium = model.IsPremium;
             module.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -126,7 +140,8 @@ namespace Api.Controllers
             return Ok(MapModule(
                 module,
                 module.Subjects.Count(s => s.IsActive),
-                module.Subjects.SelectMany(s => s.Questions).Count(q => q.IsActive)));
+                module.Subjects.SelectMany(s => s.Questions).Count(q => q.IsActive),
+                false));
         }
 
         [Authorize(Roles = "Admin")]
@@ -153,7 +168,18 @@ namespace Api.Controllers
             return Ok(new { Message = "Module deleted successfully." });
         }
 
-        private static ModuleDto MapModule(ExamModule module, int subjectCount, int questionCount)
+        private async Task<bool> CurrentStudentHasPremiumAccessAsync()
+        {
+            if (!User.IsInRole("Student"))
+            {
+                return true;
+            }
+
+            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return await _premiumAccessService.HasActivePremiumAccessAsync(studentId);
+        }
+
+        private static ModuleDto MapModule(ExamModule module, int subjectCount, int questionCount, bool requiresSubscription)
         {
             return new ModuleDto
             {
@@ -161,6 +187,8 @@ namespace Api.Controllers
                 Name = module.Name,
                 Description = module.Description,
                 IsActive = module.IsActive,
+                IsPremium = module.IsPremium,
+                RequiresSubscription = requiresSubscription,
                 SubjectCount = subjectCount,
                 QuestionCount = questionCount,
                 CreatedAt = module.CreatedAt,

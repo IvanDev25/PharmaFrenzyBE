@@ -17,6 +17,7 @@ namespace Api.Models
         public string Description { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public bool IsPremium { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -24,5 +25,6 @@ namespace Api.Models
 
         public Module Module { get; set; }
         public ICollection<Question> Questions { get; set; } = new List<Question>();
+        public ICollection<QuestionSetAccess> QuestionSetAccesses { get; set; } = new List<QuestionSetAccess>();
     }
 }

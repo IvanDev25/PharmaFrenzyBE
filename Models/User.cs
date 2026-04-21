@@ -27,5 +27,7 @@ namespace Api.Models
         public ICollection<StudentModulePoint> ModulePoints { get; set; } = new List<StudentModulePoint>();
         public ICollection<StudentRankingBadge> RankingBadges { get; set; } = new List<StudentRankingBadge>();
         public ICollection<StudentWithdrawalRequest> WithdrawalRequests { get; set; } = new List<StudentWithdrawalRequest>();
+        public ICollection<StudentSubscription> StudentSubscriptions { get; set; } = new List<StudentSubscription>();
+        public ICollection<SubscriptionPayment> SubscriptionPayments { get; set; } = new List<SubscriptionPayment>();
     }
 }

@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.DTOs.Account;
+using Api.Interface;
 using Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Api.Controllers
@@ -17,48 +19,41 @@ namespace Api.Controllers
     public class SubjectsController : ControllerBase
     {
         private readonly Context _context;
+        private readonly IPremiumAccessService _premiumAccessService;
 
-        public SubjectsController(Context context)
+        public SubjectsController(Context context, IPremiumAccessService premiumAccessService)
         {
             _context = context;
+            _premiumAccessService = premiumAccessService;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SubjectDto>>> GetSubjects([FromQuery] int? moduleId)
         {
-            var query = _context.Subjects.Include(x => x.Module).AsQueryable();
+            var query = _context.Subjects
+                .Include(x => x.Module)
+                .Include(x => x.Questions)
+                .Include(x => x.QuestionSetAccesses)
+                .AsQueryable();
 
             if (moduleId.HasValue)
             {
                 query = query.Where(x => x.ModuleId == moduleId.Value);
             }
 
-            var subjects = await query
+            var isStudent = User.IsInRole("Student");
+            var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
+            var subjectEntities = await query
                 .OrderBy(x => x.Name)
-                .Select(x => new SubjectDto
-                {
-                    Id = x.Id,
-                    ModuleId = x.ModuleId,
-                    ModuleName = x.Module.Name,
-                    Name = x.Name,
-                    Description = x.Description,
-                    IsActive = x.IsActive,
-                    QuestionCount = x.Questions.Count(q => q.IsActive),
-                    SetCount = x.Questions.Where(q => q.IsActive).Select(q => q.QuestionSetNumber).Distinct().Count(),
-                    QuestionSets = x.Questions
-                        .Where(q => q.IsActive)
-                        .GroupBy(q => q.QuestionSetNumber)
-                        .OrderBy(group => group.Key)
-                        .Select(group => new SubjectQuestionSetDto
-                        {
-                            QuestionSetNumber = group.Key,
-                            QuestionCount = group.Count()
-                        })
-                        .ToList(),
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt
-                })
                 .ToListAsync();
+
+            var subjects = subjectEntities
+                .Select(x => MapSubject(
+                    x,
+                    x.Questions.Count(q => q.IsActive),
+                    isStudent,
+                    hasPremiumAccess))
+                .ToList();
 
             return Ok(subjects);
         }
@@ -66,32 +61,13 @@ namespace Api.Controllers
         [HttpGet("{id:int}")]
         public async Task<ActionResult<SubjectDto>> GetSubject(int id)
         {
+            var isStudent = User.IsInRole("Student");
+            var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
             var subject = await _context.Subjects
                 .Include(x => x.Module)
+                .Include(x => x.Questions)
+                .Include(x => x.QuestionSetAccesses)
                 .Where(x => x.Id == id)
-                .Select(x => new SubjectDto
-                {
-                    Id = x.Id,
-                    ModuleId = x.ModuleId,
-                    ModuleName = x.Module.Name,
-                    Name = x.Name,
-                    Description = x.Description,
-                    IsActive = x.IsActive,
-                    QuestionCount = x.Questions.Count(q => q.IsActive),
-                    SetCount = x.Questions.Where(q => q.IsActive).Select(q => q.QuestionSetNumber).Distinct().Count(),
-                    QuestionSets = x.Questions
-                        .Where(q => q.IsActive)
-                        .GroupBy(q => q.QuestionSetNumber)
-                        .OrderBy(group => group.Key)
-                        .Select(group => new SubjectQuestionSetDto
-                        {
-                            QuestionSetNumber = group.Key,
-                            QuestionCount = group.Count()
-                        })
-                        .ToList(),
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt
-                })
                 .FirstOrDefaultAsync();
 
             if (subject == null)
@@ -99,7 +75,7 @@ namespace Api.Controllers
                 return NotFound(new { Message = "Subject not found." });
             }
 
-            return Ok(subject);
+            return Ok(MapSubject(subject, subject.Questions.Count(q => q.IsActive), isStudent, hasPremiumAccess));
         }
 
         [Authorize(Roles = "Admin")]
@@ -123,6 +99,7 @@ namespace Api.Controllers
                 Name = normalizedName,
                 Description = model.Description?.Trim(),
                 IsActive = model.IsActive,
+                IsPremium = model.IsPremium,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -130,9 +107,13 @@ namespace Api.Controllers
             _context.Subjects.Add(subject);
             await _context.SaveChangesAsync();
 
-            subject = await _context.Subjects.Include(x => x.Module).FirstAsync(x => x.Id == subject.Id);
+            subject = await _context.Subjects
+                .Include(x => x.Module)
+                .Include(x => x.Questions)
+                .Include(x => x.QuestionSetAccesses)
+                .FirstAsync(x => x.Id == subject.Id);
 
-            return CreatedAtAction(nameof(GetSubject), new { id = subject.Id }, MapSubject(subject, 0));
+            return CreatedAtAction(nameof(GetSubject), new { id = subject.Id }, MapSubject(subject, 0, false, true));
         }
 
         [Authorize(Roles = "Admin")]
@@ -163,6 +144,7 @@ namespace Api.Controllers
             subject.Name = normalizedName;
             subject.Description = model.Description?.Trim();
             subject.IsActive = model.IsActive;
+            subject.IsPremium = model.IsPremium;
             subject.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -170,9 +152,10 @@ namespace Api.Controllers
             subject = await _context.Subjects
                 .Include(x => x.Module)
                 .Include(x => x.Questions)
+                .Include(x => x.QuestionSetAccesses)
                 .FirstAsync(x => x.Id == id);
 
-            return Ok(MapSubject(subject, subject.Questions.Count(q => q.IsActive)));
+            return Ok(MapSubject(subject, subject.Questions.Count(q => q.IsActive), false, true));
         }
 
         [Authorize(Roles = "Admin")]
@@ -196,7 +179,22 @@ namespace Api.Controllers
             return Ok(new { Message = "Subject deleted successfully." });
         }
 
-        private static SubjectDto MapSubject(Subject subject, int questionCount)
+        private async Task<bool> CurrentStudentHasPremiumAccessAsync()
+        {
+            if (!User.IsInRole("Student"))
+            {
+                return true;
+            }
+
+            var studentId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return await _premiumAccessService.HasActivePremiumAccessAsync(studentId);
+        }
+
+        private static SubjectDto MapSubject(
+            Subject subject,
+            int questionCount,
+            bool isStudent,
+            bool hasPremiumAccess)
         {
             var questionSets = subject.Questions?
                 .Where(q => q.IsActive)
@@ -205,9 +203,15 @@ namespace Api.Controllers
                 .Select(group => new SubjectQuestionSetDto
                 {
                     QuestionSetNumber = group.Key,
-                    QuestionCount = group.Count()
+                    QuestionCount = group.Count(),
+                    IsPremium = IsQuestionSetPremium(subject, group.Key),
+                    RequiresSubscription = isStudent &&
+                        IsQuestionSetPremium(subject, group.Key) &&
+                        !hasPremiumAccess
                 })
                 .ToList() ?? new List<SubjectQuestionSetDto>();
+
+            var subjectIsPremium = subject.IsPremium || subject.Module?.IsPremium == true;
 
             return new SubjectDto
             {
@@ -217,12 +221,21 @@ namespace Api.Controllers
                 Name = subject.Name,
                 Description = subject.Description,
                 IsActive = subject.IsActive,
+                IsPremium = subject.IsPremium,
+                RequiresSubscription = isStudent && subjectIsPremium && !hasPremiumAccess,
                 QuestionCount = questionCount,
                 SetCount = questionSets.Count,
                 QuestionSets = questionSets,
                 CreatedAt = subject.CreatedAt,
                 UpdatedAt = subject.UpdatedAt
             };
+        }
+
+        private static bool IsQuestionSetPremium(Subject subject, int questionSetNumber)
+        {
+            return subject.Module?.IsPremium == true ||
+                subject.IsPremium ||
+                subject.QuestionSetAccesses?.Any(x => x.QuestionSetNumber == questionSetNumber && x.IsPremium) == true;
         }
     }
 }

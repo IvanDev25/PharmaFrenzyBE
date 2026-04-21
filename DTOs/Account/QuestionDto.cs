@@ -21,6 +21,7 @@ namespace Api.DTOs.Account
         public int Score { get; set; }
         public int? TimeLimitSeconds { get; set; }
         public bool IsActive { get; set; }
+        public bool IsQuestionSetPremium { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }

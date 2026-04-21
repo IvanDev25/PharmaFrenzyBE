@@ -1,7 +1,9 @@
 using Api.Data;
 using Api.DTOs.Account;
+using Api.Interface;
 using Api.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -21,10 +23,12 @@ namespace Api.Controllers
         private const decimal FirstPerfectExperienceReward = 5m;
         private const decimal PerfectedSubjectRetakeExperienceReward = 2m;
         private readonly Context _context;
+        private readonly IPremiumAccessService _premiumAccessService;
 
-        public ExamAttemptsController(Context context)
+        public ExamAttemptsController(Context context, IPremiumAccessService premiumAccessService)
         {
             _context = context;
+            _premiumAccessService = premiumAccessService;
         }
 
         [Authorize(Roles = "Student")]
@@ -35,6 +39,14 @@ namespace Api.Controllers
             if (string.IsNullOrEmpty(studentId))
             {
                 return Unauthorized(new { Message = "User ID was not found in the token." });
+            }
+
+            if (!await _premiumAccessService.CanAccessQuestionSetAsync(studentId, model.SubjectId, model.QuestionSetNumber))
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new
+                {
+                    Message = "This premium question set requires an active subscription."
+                });
             }
 
             var existingAttempt = await _context.ExamAttempts

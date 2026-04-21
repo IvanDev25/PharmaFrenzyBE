@@ -1,6 +1,8 @@
+using Api.Constant;
 using Api.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace Api.Data
 {
@@ -19,6 +21,10 @@ namespace Api.Data
         public DbSet<StudentRankingBadge> StudentRankingBadges { get; set; }
         public DbSet<RankingPeriodAward> RankingPeriodAwards { get; set; }
         public DbSet<StudentWithdrawalRequest> StudentWithdrawalRequests { get; set; }
+        public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
+        public DbSet<StudentSubscription> StudentSubscriptions { get; set; }
+        public DbSet<SubscriptionPayment> SubscriptionPayments { get; set; }
+        public DbSet<QuestionSetAccess> QuestionSetAccesses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -52,15 +58,37 @@ namespace Api.Data
                 .HasIndex(x => x.Name)
                 .IsUnique();
 
+            builder.Entity<Module>()
+                .Property(x => x.IsPremium)
+                .HasDefaultValue(false);
+
             builder.Entity<Subject>()
                 .HasIndex(x => new { x.ModuleId, x.Name })
                 .IsUnique();
+
+            builder.Entity<Subject>()
+                .Property(x => x.IsPremium)
+                .HasDefaultValue(false);
 
             builder.Entity<Subject>()
                 .HasOne(x => x.Module)
                 .WithMany(x => x.Subjects)
                 .HasForeignKey(x => x.ModuleId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<QuestionSetAccess>()
+                .HasIndex(x => new { x.SubjectId, x.QuestionSetNumber })
+                .IsUnique();
+
+            builder.Entity<QuestionSetAccess>()
+                .Property(x => x.QuestionSetNumber)
+                .HasDefaultValue(1);
+
+            builder.Entity<QuestionSetAccess>()
+                .HasOne(x => x.Subject)
+                .WithMany(x => x.QuestionSetAccesses)
+                .HasForeignKey(x => x.SubjectId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Question>()
                 .Property(x => x.QuestionSetNumber)
@@ -210,6 +238,107 @@ namespace Api.Data
 
             builder.Entity<StudentWithdrawalRequest>()
                 .HasIndex(x => new { x.StudentId, x.Status });
+
+            builder.Entity<SubscriptionPlan>()
+                .Property(x => x.Code)
+                .HasMaxLength(50);
+
+            builder.Entity<SubscriptionPlan>()
+                .Property(x => x.Name)
+                .HasMaxLength(150);
+
+            builder.Entity<SubscriptionPlan>()
+                .Property(x => x.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            builder.Entity<SubscriptionPlan>()
+                .HasIndex(x => x.Code)
+                .IsUnique();
+
+            builder.Entity<SubscriptionPlan>()
+                .HasData(
+                    new SubscriptionPlan
+                    {
+                        Id = 1,
+                        Code = SubscriptionPlanCodes.TwoMonths,
+                        Name = "2 Months Premium Access",
+                        Amount = 299m,
+                        DurationMonths = 2,
+                        IsLifetime = false,
+                        IsActive = true
+                    },
+                    new SubscriptionPlan
+                    {
+                        Id = 2,
+                        Code = SubscriptionPlanCodes.Lifetime,
+                        Name = "Lifetime Premium Access",
+                        Amount = 1500m,
+                        DurationMonths = null,
+                        IsLifetime = true,
+                        IsActive = true
+                    });
+
+            builder.Entity<StudentSubscription>()
+                .Property(x => x.Status)
+                .HasMaxLength(30);
+
+            builder.Entity<StudentSubscription>()
+                .HasIndex(x => new { x.StudentId, x.Status, x.ExpiresAt });
+
+            builder.Entity<StudentSubscription>()
+                .HasOne(x => x.Student)
+                .WithMany(x => x.StudentSubscriptions)
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<StudentSubscription>()
+                .HasOne(x => x.Plan)
+                .WithMany(x => x.StudentSubscriptions)
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<SubscriptionPayment>()
+                .Property(x => x.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            builder.Entity<SubscriptionPayment>()
+                .Property(x => x.Status)
+                .HasMaxLength(30);
+
+            builder.Entity<SubscriptionPayment>()
+                .Property(x => x.PaymongoCheckoutSessionId)
+                .HasMaxLength(120);
+
+            builder.Entity<SubscriptionPayment>()
+                .Property(x => x.PaymongoPaymentId)
+                .HasMaxLength(120);
+
+            builder.Entity<SubscriptionPayment>()
+                .Property(x => x.CheckoutUrl)
+                .HasMaxLength(1000);
+
+            builder.Entity<SubscriptionPayment>()
+                .HasIndex(x => x.PaymongoCheckoutSessionId)
+                .IsUnique();
+
+            builder.Entity<SubscriptionPayment>()
+                .HasIndex(x => x.PaymongoPaymentId)
+                .IsUnique();
+
+            builder.Entity<SubscriptionPayment>()
+                .HasIndex(x => new { x.StudentId, x.Status });
+
+            builder.Entity<SubscriptionPayment>()
+                .HasOne(x => x.Student)
+                .WithMany(x => x.SubscriptionPayments)
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<SubscriptionPayment>()
+                .HasOne(x => x.Plan)
+                .WithMany(x => x.SubscriptionPayments)
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

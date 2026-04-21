@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Interface;
 using Api.Models;
 using Api.Services;
+using Api.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -73,6 +75,24 @@ builder.Services.AddScoped<JWTService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<RankingBadgeService>();
 builder.Services.AddScoped<IDapperServiceAsync, DapperServiceAsync>();
+builder.Services.AddScoped<IPayMongoService, PayMongoService>();
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IPremiumAccessService, PremiumAccessService>();
+
+builder.Services.AddOptions<PayMongoSettings>()
+    .Bind(builder.Configuration.GetSection(PayMongoSettings.SectionName))
+    .Validate(settings => !string.IsNullOrWhiteSpace(settings.BaseUrl), "PayMongo BaseUrl is required.")
+    .Validate(settings => Uri.TryCreate(settings.BaseUrl, UriKind.Absolute, out _), "PayMongo BaseUrl must be a valid absolute URL.")
+    .Validate(settings => settings.TimeoutSeconds > 0, "PayMongo TimeoutSeconds must be greater than zero.");
+
+builder.Services.AddHttpClient("PayMongo", (serviceProvider, client) =>
+{
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<PayMongoSettings>>().Value;
+
+    client.BaseAddress = new Uri(settings.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+});
 
 //defining our IdentityCore Service
 builder.Services.AddIdentityCore<User>(options =>

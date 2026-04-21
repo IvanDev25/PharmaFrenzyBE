@@ -11,6 +11,8 @@ namespace Api.DTOs.Account
         public string Name { get; set; }
         public string Description { get; set; }
         public bool IsActive { get; set; }
+        public bool IsPremium { get; set; }
+        public bool RequiresSubscription { get; set; }
         public int QuestionCount { get; set; }
         public int SetCount { get; set; }
         public List<SubjectQuestionSetDto> QuestionSets { get; set; } = new List<SubjectQuestionSetDto>();

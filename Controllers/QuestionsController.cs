@@ -62,6 +62,10 @@ namespace Api.Controllers
                     Score = x.Score,
                     TimeLimitSeconds = x.TimeLimitSeconds,
                     IsActive = x.IsActive,
+                    IsQuestionSetPremium = _context.QuestionSetAccesses
+                        .Where(access => access.SubjectId == x.SubjectId && access.QuestionSetNumber == x.QuestionSetNumber)
+                        .Select(access => access.IsPremium)
+                        .FirstOrDefault(),
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt
                 })
@@ -95,6 +99,10 @@ namespace Api.Controllers
                     Score = x.Score,
                     TimeLimitSeconds = x.TimeLimitSeconds,
                     IsActive = x.IsActive,
+                    IsQuestionSetPremium = _context.QuestionSetAccesses
+                        .Where(access => access.SubjectId == x.SubjectId && access.QuestionSetNumber == x.QuestionSetNumber)
+                        .Select(access => access.IsPremium)
+                        .FirstOrDefault(),
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt
                 })
@@ -148,6 +156,7 @@ namespace Api.Controllers
             };
 
             _context.Questions.Add(question);
+            await UpsertQuestionSetAccessAsync(model.SubjectId, model.QuestionSetNumber, model.IsQuestionSetPremium);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetQuestion), new { id = question.Id }, await BuildQuestionDtoAsync(question.Id));
@@ -194,6 +203,7 @@ namespace Api.Controllers
             question.IsActive = model.IsActive;
             question.UpdatedAt = DateTime.UtcNow;
 
+            await UpsertQuestionSetAccessAsync(model.SubjectId, model.QuestionSetNumber, model.IsQuestionSetPremium);
             await _context.SaveChangesAsync();
 
             return Ok(await BuildQuestionDtoAsync(question.Id));
@@ -244,6 +254,10 @@ namespace Api.Controllers
                     Score = x.Score,
                     TimeLimitSeconds = x.TimeLimitSeconds,
                     IsActive = x.IsActive,
+                    IsQuestionSetPremium = _context.QuestionSetAccesses
+                        .Where(access => access.SubjectId == x.SubjectId && access.QuestionSetNumber == x.QuestionSetNumber)
+                        .Select(access => access.IsPremium)
+                        .FirstOrDefault(),
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt
                 })
@@ -259,6 +273,35 @@ namespace Api.Controllers
                 (!currentQuestionId.HasValue || x.Id != currentQuestionId.Value));
 
             return activeQuestionCount < 20;
+        }
+
+        private async Task UpsertQuestionSetAccessAsync(int subjectId, int questionSetNumber, bool isPremium)
+        {
+            var access = await _context.QuestionSetAccesses.FirstOrDefaultAsync(x =>
+                x.SubjectId == subjectId &&
+                x.QuestionSetNumber == questionSetNumber);
+
+            if (access == null)
+            {
+                if (!isPremium)
+                {
+                    return;
+                }
+
+                _context.QuestionSetAccesses.Add(new QuestionSetAccess
+                {
+                    SubjectId = subjectId,
+                    QuestionSetNumber = questionSetNumber,
+                    IsPremium = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+
+                return;
+            }
+
+            access.IsPremium = isPremium;
+            access.UpdatedAt = DateTime.UtcNow;
         }
 
         private static string NormalizeAnswer(string answer)

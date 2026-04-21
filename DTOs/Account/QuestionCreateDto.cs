@@ -41,5 +41,6 @@ namespace Api.DTOs.Account
 
         public int? TimeLimitSeconds { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsQuestionSetPremium { get; set; }
     }
 }
