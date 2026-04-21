@@ -1,4 +1,5 @@
 ﻿using Api.DTOs.Account;
+using Api.Interface;
 using Api.Models;
 using Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -43,6 +44,7 @@ namespace Api.Controllers
         private readonly UserManager<User> _userManager;
         private readonly EmailService _emailService;
         private readonly RankingBadgeService _rankingBadgeService;
+        private readonly ISubscriptionService _subscriptionService;
         private readonly IConfiguration _config;
         private readonly IMemoryCache _memoryCache;
         private readonly TimeZoneInfo _dailyStreakTimeZone;
@@ -57,6 +59,7 @@ namespace Api.Controllers
             UserManager<User> userManager,
             EmailService emailService,
             RankingBadgeService rankingBadgeService,
+            ISubscriptionService subscriptionService,
             IConfiguration config,
             IMemoryCache memoryCache)
         {
@@ -65,6 +68,7 @@ namespace Api.Controllers
             _userManager = userManager;
             _emailService = emailService;
             _rankingBadgeService = rankingBadgeService;
+            _subscriptionService = subscriptionService;
             _config = config;
             _memoryCache = memoryCache;
             _dailyStreakTimeZone = ResolveDailyStreakTimeZone(config["DailyStreak:TimeZoneId"]);
@@ -530,31 +534,7 @@ namespace Api.Controllers
 
             await _rankingBadgeService.EnsurePendingBadgesAwardedAsync();
 
-            var userDto = new UserDto
-            {
-                Id= user.Id,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email,
-                PhoneNumber = user.PhoneNumber,
-                University = user.University,
-                Gender = user.Gender,
-                Status = user.Status,
-                Image = user.Image,
-                Role = (await _userManager.GetRolesAsync(user)).FirstOrDefault(),
-                TotalPoints = user.TotalPoints,
-                ExperiencePoints = user.ExperiencePoints,
-                RxCoinBalance = user.RxCoinBalance,
-                RxCoinOnHold = user.RxCoinOnHold,
-                Level = CalculateLevel(user.ExperiencePoints),
-                CurrentStreak = user.CurrentStreak,
-                CanRedeemDailyStreakToday = BuildDailyStreakStatus(user).CanRedeemToday,
-                DailyStreakRewardPoints = BuildDailyStreakStatus(user).RewardPoints,
-                RankingBadges = await _rankingBadgeService.GetStudentBadgeSummaryAsync(user.Id),
-                JWT = "" // Optional, you can return JWT if needed
-            };
-
-            return Ok(userDto);
+            return Ok(await MapUserToDtoAsync(user));
         }
 
 
@@ -600,7 +580,7 @@ namespace Api.Controllers
             await _rankingBadgeService.EnsurePendingBadgesAwardedAsync();
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
 
-            return new UserDto
+            var userDto = new UserDto
             {
                 Id = user.Id,
                 FirstName = user.FirstName,
@@ -623,13 +603,17 @@ namespace Api.Controllers
                 RankingBadges = await _rankingBadgeService.GetStudentBadgeSummaryAsync(user.Id),
                 JWT= await _jwtService.CreateJWTAsync(user),
             };
+
+            await ApplySubscriptionStatusAsync(userDto, role, user.Id);
+
+            return userDto;
         }
 
         private async Task<UserDto> MapUserToDtoAsync(User user)
         {
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
 
-            return new UserDto
+            var userDto = new UserDto
             {
                 Id = user.Id,
                 FirstName = user.FirstName,
@@ -651,6 +635,26 @@ namespace Api.Controllers
                 DailyStreakRewardPoints = BuildDailyStreakStatus(user).RewardPoints,
                 JWT = ""
             };
+
+            await ApplySubscriptionStatusAsync(userDto, role, user.Id);
+
+            return userDto;
+        }
+
+        private async Task ApplySubscriptionStatusAsync(UserDto userDto, string role, string userId)
+        {
+            if (!string.Equals(role, "Student", StringComparison.OrdinalIgnoreCase))
+            {
+                userDto.SubscriptionStatus = "N/A";
+                return;
+            }
+
+            var subscriptionStatus = await _subscriptionService.GetStudentSubscriptionStatusAsync(userId);
+            userDto.HasActivePremiumAccess = subscriptionStatus.HasActivePremiumAccess;
+            userDto.SubscriptionStatus = subscriptionStatus.HasActivePremiumAccess ? "Subscribed" : "Free";
+            userDto.SubscriptionPlanName = subscriptionStatus.PlanName;
+            userDto.SubscriptionExpiresAt = subscriptionStatus.ExpiresAt;
+            userDto.IsLifetimeSubscription = subscriptionStatus.IsLifetime;
         }
 
         private async Task<User> GetCurrentUserAsync()

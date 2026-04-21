@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Api.DTOs.Account
@@ -22,6 +23,11 @@ namespace Api.DTOs.Account
         public int CurrentStreak { get; set; }
         public bool CanRedeemDailyStreakToday { get; set; }
         public decimal DailyStreakRewardPoints { get; set; }
+        public bool HasActivePremiumAccess { get; set; }
+        public string SubscriptionStatus { get; set; }
+        public string SubscriptionPlanName { get; set; }
+        public DateTime? SubscriptionExpiresAt { get; set; }
+        public bool IsLifetimeSubscription { get; set; }
         public List<RankingBadgeDto> RankingBadges { get; set; } = new List<RankingBadgeDto>();
         public string JWT { get; set; }
     }
