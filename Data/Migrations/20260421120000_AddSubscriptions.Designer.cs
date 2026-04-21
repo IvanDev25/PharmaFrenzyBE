@@ -11,7 +11,6 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(Context))]
-    [Migration("20260421120000_AddSubscriptions")]
     partial class AddSubscriptions
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
