@@ -61,14 +61,15 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
-builder.Services.AddDbContext<Context>(options =>
+builder.Services.AddDbContextPool<Context>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
     options.UseMySql(
         connectionString,
-        new MySqlServerVersion(new Version(8, 0, 36)));
-});
+        new MySqlServerVersion(new Version(8, 0, 36)),
+        mySqlOptions => mySqlOptions.CommandTimeout(60));
+}, poolSize: 20);
 
 // be able to inject JWTService class inside our contorllers
 builder.Services.AddScoped<JWTService>();
