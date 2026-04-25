@@ -34,6 +34,9 @@ namespace Api.Controllers
             var isStudent = User.IsInRole("Student");
             var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
             var modules = await _context.Modules
+                .AsNoTracking()
+                .Include(x => x.Subjects)
+                    .ThenInclude(s => s.Questions)
                 .OrderBy(x => x.Name)
                 .Select(x => new ModuleDto
                 {
@@ -59,6 +62,9 @@ namespace Api.Controllers
             var isStudent = User.IsInRole("Student");
             var hasPremiumAccess = await CurrentStudentHasPremiumAccessAsync();
             var module = await _context.Modules
+                .AsNoTracking()
+                .Include(x => x.Subjects)
+                    .ThenInclude(s => s.Questions)
                 .Where(x => x.Id == id)
                 .Select(x => new ModuleDto
                 {

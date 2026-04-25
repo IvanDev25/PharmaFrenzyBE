@@ -62,6 +62,7 @@ namespace Api.Controllers
             }
 
             var subject = await _context.Subjects
+                .AsNoTracking()
                 .Include(x => x.Module)
                 .Include(x => x.Questions)
                 .FirstOrDefaultAsync(x => x.Id == model.SubjectId && x.IsActive);
@@ -355,7 +356,9 @@ namespace Api.Controllers
             }
 
             var attempts = await _context.ExamAttempts
+                .AsNoTracking()
                 .Include(x => x.Subject)
+                    .ThenInclude(x => x.Module)
                 .Where(x => x.StudentId == studentId)
                 .OrderByDescending(x => x.StartedAt)
                 .Select(x => new ExamAttemptDto
@@ -387,6 +390,7 @@ namespace Api.Controllers
         public async Task<ActionResult<IEnumerable<StudentPerformanceDto>>> GetPerformance([FromQuery] int? moduleId, [FromQuery] int? subjectId, [FromQuery] string studentId)
         {
             var query = _context.ExamAttempts
+                .AsNoTracking()
                 .Include(x => x.Subject)
                     .ThenInclude(x => x.Module)
                 .Include(x => x.Student)

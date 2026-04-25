@@ -458,7 +458,7 @@ namespace Api.Controllers
         {
             try
             {
-                var users = await _userManager.Users.ToListAsync();
+                var users = await _userManager.Users.AsNoTracking().ToListAsync();
                 var userDtos = new List<UserDto>();
 
                 foreach (var user in users)
@@ -525,7 +525,7 @@ namespace Api.Controllers
                 return BadRequest(new { Message = "The user ID is required." });
             }
 
-            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _userManager.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
 
             if (user == null)
             {
@@ -579,6 +579,7 @@ namespace Api.Controllers
         {
             await _rankingBadgeService.EnsurePendingBadgesAwardedAsync();
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+            var dailyStreakStatus = BuildDailyStreakStatus(user);
 
             var userDto = new UserDto
             {
@@ -598,8 +599,8 @@ namespace Api.Controllers
                 RxCoinOnHold = user.RxCoinOnHold,
                 Level = CalculateLevel(user.ExperiencePoints),
                 CurrentStreak = user.CurrentStreak,
-                CanRedeemDailyStreakToday = BuildDailyStreakStatus(user).CanRedeemToday,
-                DailyStreakRewardPoints = BuildDailyStreakStatus(user).RewardPoints,
+                CanRedeemDailyStreakToday = dailyStreakStatus.CanRedeemToday,
+                DailyStreakRewardPoints = dailyStreakStatus.RewardPoints,
                 RankingBadges = await _rankingBadgeService.GetStudentBadgeSummaryAsync(user.Id),
                 JWT= await _jwtService.CreateJWTAsync(user),
             };
@@ -612,6 +613,7 @@ namespace Api.Controllers
         private async Task<UserDto> MapUserToDtoAsync(User user)
         {
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+            var dailyStreakStatus = BuildDailyStreakStatus(user);
 
             var userDto = new UserDto
             {
@@ -631,8 +633,8 @@ namespace Api.Controllers
                 RxCoinOnHold = user.RxCoinOnHold,
                 Level = CalculateLevel(user.ExperiencePoints),
                 CurrentStreak = user.CurrentStreak,
-                CanRedeemDailyStreakToday = BuildDailyStreakStatus(user).CanRedeemToday,
-                DailyStreakRewardPoints = BuildDailyStreakStatus(user).RewardPoints,
+                CanRedeemDailyStreakToday = dailyStreakStatus.CanRedeemToday,
+                DailyStreakRewardPoints = dailyStreakStatus.RewardPoints,
                 JWT = ""
             };
 
